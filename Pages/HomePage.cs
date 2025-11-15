@@ -3,7 +3,7 @@ using Microsoft.Playwright;
 
 namespace AutomationExerciseTests.Pages
 {
-    public class HomePage : BasePage
+    public class HomePage: BasePage
     {
         public HomePage(IPage page) : base(page) { }
 
