@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace AutomationExerciseTests.Pages
 {
-    public class CheckoutPage : BasePage
+    public class CheckoutPage: BasePage
     {
         public CheckoutPage(IPage page) : base(page) { }
 
