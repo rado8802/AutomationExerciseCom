@@ -1,19 +1,26 @@
-using Microsoft.Playwright;
 using System.Threading.Tasks;
+using Microsoft.Playwright;
 
 namespace AutomationExerciseTests.Pages
 {
-    public class CartPage: BasePage
+    public class CartPage
     {
-        public CartPage(IPage page) : base(page) { }
+        private readonly IPage _page;
 
-        public ILocator CartHeader => Page.Locator("h2:has-text('Shopping Cart')");
-        public ILocator CartTable => Page.Locator("#cart_info_table");
-        public ILocator ProceedToCheckoutBtn => Page.GetByRole(AriaRole.Link, new() { Name = "Proceed To Checkout" });
+        public CartPage(IPage page)
+        {
+            _page = page;
+        }
 
         public async Task OpenAsync()
         {
-            await Page.GotoAsync("https://automationexercise.com/view_cart");
+            await _page.GotoAsync("https://automationexercise.com/view_cart");
+        }
+
+        public async Task<int> GetCartItemCountAsync()
+        {
+            var rows = _page.Locator("tr[id^='product-']");
+            return await rows.CountAsync();
         }
     }
 }
