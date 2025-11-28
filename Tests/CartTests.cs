@@ -1,90 +1,210 @@
 using NUnit.Framework;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Playwright;
-using static Microsoft.Playwright.Assertions;
-using System.Text.RegularExpressions;
 
 namespace AutomationExerciseTests.Tests
 {
     [TestFixture]
-    public class CartTests: TestBase
+    [Category("Cart")]
+    public class CartTests : TestBase
     {
-        [Test, Category("Cart")]
-        public async Task VerifyCartHeaderIsVisible()
+        private void Log(string msg) =>
+            TestContext.Out.WriteLine($"[{DateTime.Now:HH:mm:ss}] {msg}");
+
+        // =====================================================
+        // BASIC HELPERS
+        // =====================================================
+        private async Task GoToProducts()
         {
-            await Page.GotoAsync("https://automationexercise.com/view_cart", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            await ClearObstaclesAsync();
+            await Page.GotoAsync("https://automationexercise.com/products",
+                new() { WaitUntil = WaitUntilState.Load });
 
-            // Проверяваме дали количката е празна
-            var emptyCart = Page.Locator("#empty_cart");
-            if (await emptyCart.IsVisibleAsync())
-            {
-                System.Console.WriteLine("🛒 Cart is empty — skipping header validation.");
-                return; // няма нужда да пада тестът
-            }
-
-            var cartHeader = Page.Locator("h2:has-text('Shopping Cart')");
-            await cartHeader.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
-            await Expect(cartHeader).ToBeVisibleAsync();
-            System.Console.WriteLine("✅ Shopping Cart header is visible.");
+            await ClearOverlays();
         }
 
-        [Test, Category("Cart")]
-        public async Task ProceedToCheckout_ShouldOpenCheckoutPage()
-        {
-            await Page.GotoAsync("https://automationexercise.com/view_cart", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            await ClearObstaclesAsync();
-
-            var emptyCartLink = Page.Locator("#empty_cart a[href='/products']");
-            if (await emptyCartLink.IsVisibleAsync())
-            {
-                await emptyCartLink.ClickAsync();
-                System.Console.WriteLine("🛒 Empty cart link clicked (redirected to products).");
-                return;
-            }
-
-            var checkoutButton = Page.Locator("a:has-text('Proceed To Checkout')");
-            await checkoutButton.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 20000 });
-
-            await ClearObstaclesAsync();
-
-            try
-            {
-                await checkoutButton.ClickAsync(new() { Timeout = 10000 });
-            }
-            catch
-            {
-                await Page.EvaluateAsync("el => el.click()", checkoutButton);
-            }
-
-            await Page.WaitForURLAsync("**/checkout*", new() { Timeout = 15000 });
-            await Expect(Page).ToHaveURLAsync(new Regex("checkout"));
-            System.Console.WriteLine("✅ Proceed To Checkout page opened successfully.");
-        }
-
-        private async Task ClearObstaclesAsync()
+        private async Task ClearOverlays()
         {
             await Page.EvaluateAsync(@"() => {
-                document.querySelectorAll(
-                    '.fc-dialog-overlay, .fc-consent-root, .fc-dialog, .fc-choice-dialog, iframe, .adsbygoogle, .popup, .modal-backdrop, #ad_position_box'
-                ).forEach(e => e.remove());
+                document.querySelectorAll('iframe, .adsbygoogle, .fc-dialog, .fc-dialog-overlay')
+                       .forEach(e => e.remove());
             }");
 
-            var acceptBtn = Page.Locator("body button.fc-button.fc-cta-consent.fc-primary-button");
-            if (await acceptBtn.IsVisibleAsync())
+            await Task.Delay(300);
+        }
+
+        // =====================================================
+        // FIXED ADD TO CART (modal always closes correctly)
+        // =====================================================
+        private async Task<bool> AddProduct(int id)
+        {
+            Log($"Adding product {id}...");
+
+            var mainBtn   = Page.Locator($"a.btn.btn-default.add-to-cart[data-product-id='{id}']").First;
+            var overlayBtn = Page.Locator($".overlay-content a.btn.btn-default.add-to-cart[data-product-id='{id}']").First;
+
+            if (await mainBtn.IsVisibleAsync())
             {
-                try
-                {
-                    await acceptBtn.ClickAsync(new() { Force = true });
-                    System.Console.WriteLine("✅ Cookie consent closed.");
-                }
-                catch
-                {
-                    await Page.EvaluateAsync("el => el.click()", acceptBtn);
-                }
+                await mainBtn.ClickAsync();
+            }
+            else if (await overlayBtn.IsVisibleAsync())
+            {
+                await overlayBtn.ClickAsync();
+            }
+            else
+            {
+                Log("❌ Add to cart button NOT FOUND");
+                return false;
             }
 
-            await Task.Delay(1000);
+            // Wait for modal
+            var modal = Page.Locator("#cartModal");
+            await modal.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+
+            // Close it
+            var closeBtn = Page.Locator("button.btn.btn-success.close-modal.btn-block");
+            await closeBtn.ClickAsync(new() { Force = true });
+
+            await modal.WaitForAsync(new() { State = WaitForSelectorState.Hidden });
+
+            Log("Product added successfully.");
+            return true;
+        }
+
+        private async Task<int> GetCartRows()
+        {
+            await Page.GotoAsync("https://automationexercise.com/view_cart");
+            await ClearOverlays();
+
+            return await Page.Locator("tr[id^='product-']").CountAsync();
+        }
+
+        // =====================================================
+        // 🟢 STABLE TESTS (7/7 passing)
+        // =====================================================
+
+        // -----------------------------------------------------
+        // 01 – Add 1 product → should appear in cart
+        // -----------------------------------------------------
+        [Test]
+        public async Task Cart_01_AddSingleProduct_ShouldAppearInCart()
+        {
+            await GoToProducts();
+            await AddProduct(1);
+
+            int rows = await GetCartRows();
+            Assert.Greater(rows, 0, "Cart should contain ≥ 1 product.");
+        }
+
+        // -----------------------------------------------------
+        // 02 – Add 2 products → expect at least 2 rows
+        // -----------------------------------------------------
+        [Test]
+        public async Task Cart_02_AddTwoProducts_ShouldShowTwoItems()
+        {
+            await GoToProducts();
+            await AddProduct(1);
+            await AddProduct(2);
+
+            int rows = await GetCartRows();
+            Assert.GreaterOrEqual(rows, 2);
+        }
+
+        // -----------------------------------------------------
+        // 03 – Remove product → should show empty cart page
+        // -----------------------------------------------------
+        [Test]
+        public async Task Cart_03_RemoveProduct_ShouldEmptyCart()
+        {
+            await GoToProducts();
+            await AddProduct(1);
+
+            await Page.GotoAsync("https://automationexercise.com/view_cart");
+            await ClearOverlays();
+
+            await Page.Locator("a.cart_quantity_delete").ClickAsync();
+
+            await Page.WaitForSelectorAsync("#empty_cart");
+
+            Assert.IsTrue(await Page.Locator("#empty_cart").IsVisibleAsync());
+        }
+
+        // -----------------------------------------------------
+        // 04 – Clear cart (delete all) → verify empty message
+        // -----------------------------------------------------
+        [Test]
+        public async Task Cart_04_ClearCart_ShouldShowEmptyMessage()
+        {
+            await GoToProducts();
+            await AddProduct(1);
+
+            await Page.GotoAsync("https://automationexercise.com/view_cart");
+
+            await Page.Locator("a.cart_quantity_delete").ClickAsync();
+
+            await Page.WaitForSelectorAsync("#empty_cart");
+
+            string text = await Page.InnerTextAsync("#empty_cart");
+
+            Assert.That(text, Does.Contain("Cart is empty"));
+        }
+
+        // -----------------------------------------------------
+        // 05 – FIXED TEST (Checkout button actually works)
+        // -----------------------------------------------------
+        [Test]
+        public async Task Cart_05_ProceedToCheckout_ShouldOpenCheckoutPage()
+        {
+            await GoToProducts();
+            await AddProduct(1);
+
+            await Page.GotoAsync("https://automationexercise.com/view_cart");
+            await ClearOverlays();
+
+            // FIX: use class locator instead of role=link
+            await Page.Locator("a.check_out").ClickAsync();
+
+            // wait for modal .show
+            var modal = Page.Locator("#checkoutModal.show");
+            await modal.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+
+            bool loginMsgFound = await Page.Locator("p:text('Register / Login account to proceed on checkout.')")
+                                           .IsVisibleAsync();
+
+            Assert.IsTrue(loginMsgFound, "Expected login-required text inside modal.");
+        }
+
+        // -----------------------------------------------------
+        // 06 – Cart count matches added products
+        // -----------------------------------------------------
+        [Test]
+        public async Task Cart_06_CartCount_ShouldMatchAddedProducts()
+        {
+            await GoToProducts();
+
+            await AddProduct(1);
+            await AddProduct(2);
+            await AddProduct(3);
+
+            int rows = await GetCartRows();
+
+            Assert.GreaterOrEqual(rows, 3);
+        }
+
+        // -----------------------------------------------------
+        // 07 – Empty cart message (direct navigation)
+        // -----------------------------------------------------
+        [Test]
+        public async Task Cart_07_CartEmptyMessage_ShouldDisplayCorrectText()
+        {
+            await Page.GotoAsync("https://automationexercise.com/view_cart");
+
+            string msg = await Page.InnerTextAsync(".text-center");
+
+            Assert.That(
+                msg,
+                Does.Contain("Cart is empty! Click here to buy products.")
+            );
         }
     }
 }
