@@ -7,7 +7,7 @@ namespace AutomationExerciseTests.Tests
 {
     [TestFixture]
     [Category("ProductPage")]
-    public class ProductPageTests: TestBase
+    public class ProductPageTests : TestBase
     {
         [Test]
         public async Task OpenProductPage_ShouldDisplayProductDetails()
