@@ -7,7 +7,7 @@ using static Microsoft.Playwright.Assertions;
 namespace AutomationExerciseTests.Tests
 {
     [TestFixture]
-    public class ContactTests: TestBase
+    public class ContactTests : TestBase
     {
         [Test, Category("Contact")]
         public async Task SubmitContactForm_ShouldShowSuccessMessage()
