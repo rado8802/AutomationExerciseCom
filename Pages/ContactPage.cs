@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace AutomationExerciseTests.Pages
 {
-    public class ContactPage: BasePage
+    public class ContactPage : BasePage
     {
         public ContactPage(IPage page) : base(page) { }
 
