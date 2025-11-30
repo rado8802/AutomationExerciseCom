@@ -353,5 +353,40 @@ namespace AutomationExerciseTests.Tests
                 Assert.That(cartProduct2.Trim(), Does.Contain(product2Name.Trim()),
                     "Product 2 name in cart does not match the one added.");
             }
+            [Test, Order(12)]
+            public async Task Test_12_CartQuantity_ShouldPersistAfterPageRefresh()
+            {
+                // Go to products
+                await GoToProducts();
+
+                // Add product 1 twice
+                await AddProduct(1);
+                await AddProduct(1);
+
+                // Open cart
+                await Page.GotoAsync("https://automationexercise.com/view_cart");
+                await ClearOverlays();
+
+                // Read quantity BEFORE refresh
+                string qtyTextBefore = await Page.Locator("tbody tr").First
+                    .Locator("td:nth-child(4)").InnerTextAsync();
+                int qtyBefore = int.Parse(new string(qtyTextBefore.Where(char.IsDigit).ToArray()));
+
+                Assert.That(qtyBefore, Is.GreaterThanOrEqualTo(2),
+                    "Quantity should be at least 2 before refreshing.");
+
+                // Refresh page
+                await Page.ReloadAsync();
+                await ClearOverlays();
+
+                // Read quantity AFTER refresh
+                string qtyTextAfter = await Page.Locator("tbody tr").First
+                    .Locator("td:nth-child(4)").InnerTextAsync();
+                int qtyAfter = int.Parse(new string(qtyTextAfter.Where(char.IsDigit).ToArray()));
+
+                // Assert quantity was preserved
+                Assert.That(qtyAfter, Is.EqualTo(qtyBefore),
+                    "Quantity after page refresh should remain the same.");
+            }
     }
 }
