@@ -251,59 +251,34 @@ namespace AutomationExerciseTests.Tests
             Assert.That(calculatedTotal, Is.EqualTo(expectedTotal),
                 $"Expected: {expectedTotal}, but UI sum: {calculatedTotal}");
         }
-        [Test, Order(9)]
-        public async Task Test_09_IncreasingQuantity_ShouldUpdateTotalCorrectly()
-        {
-            // Go to products
-            await Page.GotoAsync("https://automationexercise.com/products");
-            await ClearOverlays();
-
-            // Add a product
-            await Page.Locator("a.btn.add-to-cart[data-product-id='1']").First.ClickAsync();
-            var cont = Page.GetByRole(AriaRole.Button, new() { Name = "Continue Shopping" });
-            if (await cont.IsVisibleAsync()) await cont.ClickAsync();
-
-            // Open cart
-            await Page.GotoAsync("https://automationexercise.com/view_cart");
-            await ClearOverlays();
-
-            var row = Page.Locator("tbody tr").First;
-
-            // Check if site supports + button for quantity
-            var increaseBtn = row.Locator(".cart_quantity_up");
-            if (!await increaseBtn.IsVisibleAsync())
+            [Test, Order(9)]
+            public async Task Test_09_SameProductTwice_ShouldMergeIntoSingleRow() 
             {
-                Assert.Pass("Site does not support increasing quantity with a + button.");
-                return;
+                // Open products page
+                await GoToProducts();
+
+                // Add same product twice
+                await AddProduct(1);
+                await AddProduct(1);
+
+                // Open cart
+                await Page.GotoAsync("https://automationexercise.com/view_cart");
+                await ClearOverlays();
+
+                // Count cart rows
+                int rows = await Page.Locator("tr[id^='product-']").CountAsync();
+
+                // Read quantity of the first row
+                var qtyText = await Page.Locator("tbody tr").First
+                    .Locator("td:nth-child(4)").InnerTextAsync();
+                int qty = int.Parse(new string(qtyText.Where(char.IsDigit).ToArray()));
+
+                // Assert: the cart should have only 1 row
+                Assert.That(rows, Is.EqualTo(1), "Same product should not create multiple cart rows.");
+
+                // Assert: quantity should be 2
+                Assert.That(qty, Is.GreaterThanOrEqualTo(2),
+                    "Quantity should increase when adding the same product twice.");
             }
-
-            // Read initial price
-            string priceText = await row.Locator("td:nth-child(3)").InnerTextAsync();
-            decimal price = decimal.Parse(new string(priceText.Where(char.IsDigit).ToArray()));
-
-            // Read initial qty
-            string qtyText = await row.Locator("td:nth-child(4)").InnerTextAsync();
-            int initialQty = int.Parse(new string(qtyText.Where(char.IsDigit).ToArray()));
-
-            // Increase quantity
-            await increaseBtn.ClickAsync();
-            await Page.WaitForTimeoutAsync(1500);
-
-            // Read updated qty
-            string newQtyText = await row.Locator("td:nth-child(4)").InnerTextAsync();
-            int updatedQty = int.Parse(new string(newQtyText.Where(char.IsDigit).ToArray()));
-
-            Assert.That(updatedQty, Is.EqualTo(initialQty + 1),
-                $"Expected qty: {initialQty + 1}, got: {updatedQty}");
-
-            // Read updated row total
-            string rowTotalText = await row.Locator("td:nth-child(5)").InnerTextAsync();
-            decimal rowTotal = decimal.Parse(new string(rowTotalText.Where(char.IsDigit).ToArray()));
-
-            decimal expectedTotal = price * updatedQty;
-
-            Assert.That(rowTotal, Is.EqualTo(expectedTotal),
-                $"Expected row total {expectedTotal}, but UI shows: {rowTotal}");
-        }
     }
 }
