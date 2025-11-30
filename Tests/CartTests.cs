@@ -280,5 +280,45 @@ namespace AutomationExerciseTests.Tests
                 Assert.That(qty, Is.GreaterThanOrEqualTo(2),
                     "Quantity should increase when adding the same product twice.");
             }
+            [Test, Order(10)]
+            public async Task Test_10_RemovingOneProduct_ShouldUpdateCartTotalCorrectly()
+            {
+                // Go to products
+                await GoToProducts();
+
+                // Add two different products
+                await AddProduct(1);
+                await AddProduct(2);
+
+                // Open cart
+                await Page.GotoAsync("https://automationexercise.com/view_cart");
+                await ClearOverlays();
+
+                var rows = Page.Locator("tbody tr");
+                int rowCountBefore = await rows.CountAsync();
+                Assert.That(rowCountBefore, Is.GreaterThanOrEqualTo(2), "Expected at least 2 rows before deletion.");
+
+                // Calculate expected remaining total AFTER removing first product
+                // 1) Read second row price
+                string priceText2 = await rows.Nth(1).Locator("td:nth-child(3)").InnerTextAsync();
+                decimal price2 = decimal.Parse(new string(priceText2.Where(char.IsDigit).ToArray()));
+
+                // 2) Read second row qty
+                string qtyText2 = await rows.Nth(1).Locator("td:nth-child(4)").InnerTextAsync();
+                int qty2 = int.Parse(new string(qtyText2.Where(char.IsDigit).ToArray()));
+
+                decimal expectedRemainingTotal = price2 * qty2;
+
+                // Remove FIRST product
+                await rows.First.Locator("a.cart_quantity_delete").ClickAsync();
+                await Page.WaitForTimeoutAsync(1500);
+
+                // Read displayed total from UI (remaining row)
+                string remainingTotalText = await rows.First.Locator("td:nth-child(5)").InnerTextAsync();
+                decimal remainingTotal = decimal.Parse(new string(remainingTotalText.Where(char.IsDigit).ToArray()));
+
+                Assert.That(remainingTotal, Is.EqualTo(expectedRemainingTotal),
+                    $"Expected total after deletion: {expectedRemainingTotal}, but UI shows {remainingTotal}");
+            }
     }
 }
