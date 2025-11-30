@@ -320,5 +320,38 @@ namespace AutomationExerciseTests.Tests
                 Assert.That(remainingTotal, Is.EqualTo(expectedRemainingTotal),
                     $"Expected total after deletion: {expectedRemainingTotal}, but UI shows {remainingTotal}");
             }
+            [Test, Order(11)]
+            public async Task Test_11_ProductNamesInCart_ShouldMatchAddedProducts()
+            {
+                await GoToProducts();
+
+                // --- Add Product 1 ---
+                var product1Name = await Page.Locator(".productinfo.text-center").Nth(0)
+                    .Locator("p").InnerTextAsync();
+                await AddProduct(1);
+
+                // --- Add Product 2 ---
+                var product2Name = await Page.Locator(".productinfo.text-center").Nth(1)
+                    .Locator("p").InnerTextAsync();
+                await AddProduct(2);
+
+                // Open cart
+                await Page.GotoAsync("https://automationexercise.com/view_cart");
+                await ClearOverlays();
+
+                // Read product names in cart table
+                var cartProduct1 = await Page.Locator("tbody tr").Nth(0)
+                    .Locator("td:nth-child(2)").InnerTextAsync();
+
+                var cartProduct2 = await Page.Locator("tbody tr").Nth(1)
+                    .Locator("td:nth-child(2)").InnerTextAsync();
+
+                // Assertions
+                Assert.That(cartProduct1.Trim(), Does.Contain(product1Name.Trim()),
+                    "Product 1 name in cart does not match the one added.");
+
+                Assert.That(cartProduct2.Trim(), Does.Contain(product2Name.Trim()),
+                    "Product 2 name in cart does not match the one added.");
+            }
     }
 }
