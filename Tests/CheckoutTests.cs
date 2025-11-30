@@ -73,5 +73,52 @@ namespace AutomationExerciseTests.Tests
             await Page.WaitForURLAsync("**/checkout*", new() { Timeout = 15000 });
             Assert.That(Page.Url, Does.Contain("checkout"));
         }
+        [Test, Category("Checkout")]
+        public async Task Test_02_LoggedInUser_ShouldSeeAddressAndOrderSections_OnCheckoutPage()
+        {
+            // Go to login
+            await Page.GotoAsync("https://automationexercise.com/login");
+            await ClearOverlays();
+
+            // Login
+            await Page.FillAsync("input[data-qa='login-email']", TestData.ValidEmail);
+            await Page.FillAsync("input[data-qa='login-password']", TestData.ValidPassword);
+            await Page.ClickAsync("button[data-qa='login-button']");
+
+            // Wait for login success
+            await Page.WaitForTimeoutAsync(1500);
+            Assert.IsTrue(
+                await Page.Locator("a:has-text('Logged in as')").IsVisibleAsync(),
+                "Login failed — user not logged in."
+            );
+
+            // Add a product
+            await Page.GotoAsync("https://automationexercise.com/products");
+            await ClearOverlays();
+            await Page.Locator("a.btn.btn-default.add-to-cart").First.ClickAsync();
+
+            // FIX: remove modal completely
+            await Page.EvaluateAsync("document.querySelector('#cartModal')?.remove()");
+
+            // Open cart
+            await Page.GotoAsync("https://automationexercise.com/view_cart");
+            await ClearOverlays();
+
+            // Proceed to checkout
+            await Page.Locator("a:has-text('Proceed To Checkout')")
+                .ClickAsync(new() { Force = true });
+
+            await Page.WaitForURLAsync("**/checkout*", new() { Timeout = 10000 });
+
+            // CHECKPOINTS ON CHECKOUT PAGE
+            var addressHeader = Page.Locator("h2:has-text('Address Details')");
+            var reviewHeader  = Page.Locator("h2:has-text('Review Your Order')");
+
+            Assert.IsTrue(await addressHeader.IsVisibleAsync(),
+                "Address Details block is missing on checkout page.");
+
+            Assert.IsTrue(await reviewHeader.IsVisibleAsync(),
+                "Review Your Order block is missing on checkout page.");
+        }
     }
 }
